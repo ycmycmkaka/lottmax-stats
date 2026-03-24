@@ -8,7 +8,6 @@ def get_web_data():
     all_draws = []
     current_year = datetime.now().year
     
-    # 自動爬取過去 4 年嘅開彩數據
     for year in range(current_year, current_year - 4, -1):
         url = f"https://www.lottomaxnumbers.com/numbers/{year}"
         print(f"📡 自動獲取緊 {year} 年嘅數據...")
@@ -17,21 +16,16 @@ def get_web_data():
         resp = requests.get(url, headers=headers)
         soup = BeautifulSoup(resp.text, 'html.parser')
         
-        # 喺網頁 HTML 入面搵開彩表格
         for row in soup.find_all('tr'):
             cols = row.find_all('td')
             if len(cols) >= 2:
-                # 1. 攞日期
                 date_str = cols[0].get_text(strip=True)
-                
-                # 2. 攞號碼波波
                 balls = []
                 for element in cols[1].find_all(['li', 'div', 'span']):
                     txt = element.get_text(strip=True)
                     if txt.isdigit():
                         balls.append(int(txt))
                 
-                # 3. 確保抽齊 7 個號碼
                 if len(balls) >= 7:
                     nums = sorted(balls[:7])
                     all_draws.append({
@@ -43,7 +37,6 @@ def get_web_data():
     return pd.DataFrame(all_draws)
 
 def calculate_metrics(df):
-    # 排好日期，由舊到新
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df = df.dropna(subset=['date']).drop_duplicates(subset=['date']).sort_values('date', ascending=True)
     
@@ -53,11 +46,12 @@ def calculate_metrics(df):
     for _, row in df.iterrows():
         nums = [int(row[f'n{i}']) for i in range(1, 8)]
         
-        # 統計 1: 單雙
+        # 1. 單雙 (轉做直觀廣東話)
         odds = sum(1 for n in nums if n % 2 != 0)
-        row['odd_even'] = f"{odds}O{7-odds}E"
+        evens = 7 - odds
+        row['odd_even'] = f"{odds}單 {evens}雙"
         
-        # 統計 2: 連續
+        # 2. 連續
         has_consec = "No"
         for i in range(len(nums)-1):
             if nums[i+1] - nums[i] == 1:
@@ -65,17 +59,23 @@ def calculate_metrics(df):
                 break
         row['consecutive'] = has_consec
         
-        # 統計 3: 上期重複
+        # 3. 上期重複
         curr_set = set(nums)
         row['repeats'] = len(curr_set.intersection(prev_numbers)) if prev_numbers else 0
         prev_numbers = curr_set
         
-        # 統計 4: 分區 Zone
-        row['zone'] = f"Z{(nums[0]-1)//7 + 1}"
+        # 4. 精準分區 Zone (1-10為1區, 11-20為2區... 41-50為5區)
+        zones_hit = set()
+        for n in nums:
+            zone_num = (n - 1) // 10 + 1
+            zones_hit.add(zone_num)
+        
+        zones_list = sorted(list(zones_hit))
+        # 顯示格式例如: "4個區 (1,3,4,5)"
+        row['zone'] = f"{len(zones_list)}個區 ({','.join(map(str, zones_list))})"
         
         results.append(row)
         
-    # 最後排返由新到舊
     final_df = pd.DataFrame(results).sort_values('date', ascending=False)
     final_df['date'] = final_df['date'].dt.strftime('%Y-%m-%d')
     return final_df
@@ -87,7 +87,7 @@ def main():
     if len(df) > 0:
         final_df = calculate_metrics(df)
         final_df.to_csv('data.csv', index=False)
-        print(f"✅ 大功告成！成功上網獲取並分析咗 {len(final_df)} 期 Lotto Max 數據！")
+        print(f"✅ 大功告成！成功分析 {len(final_df)} 期數據！")
     else:
         print("❌ 錯誤：爬唔到任何數據。")
 

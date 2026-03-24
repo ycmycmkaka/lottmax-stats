@@ -2,57 +2,76 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>Lotto Max 深度分析表 📈</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lotto Max 深度走勢分析表 📈</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-        th { background: #007aff; color: white; position: sticky; top: 0; padding: 12px; }
-        td { border: 1px solid #eee; padding: 10px; text-align: center; }
-        tr:nth-child(even) { background: #fafafa; }
-        .num-ball { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: #eee; margin: 2px; font-weight: bold; }
-        .repeat-high { color: red; font-weight: bold; } /* 重複多過2個變紅 */
-        .consec-yes { background: #fff3cd; color: #856404; padding: 2px 5px; border-radius: 4px; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #007aff; margin-bottom: 25px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #007aff; color: white; padding: 12px; position: sticky; top: 0; z-index: 10; }
+        td { border-bottom: 1px solid #eee; padding: 12px; text-align: center; }
+        tr:hover { background-color: #f8fbff; }
+        .num-ball { display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: linear-gradient(135deg, #ffffff 0%, #e9ecef 100%); margin: 2px; font-weight: bold; border: 1px solid #ccc; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .stat-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+        .consec-yes { background: #e6f4ea; color: #1e8e3e; }
+        .repeat-high { background: #fce8e6; color: #d93025; }
+        .zone-label { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Lotto Max 走勢分析儀表板</h2>
-    <div id="table-container">讀取數據中...</div>
+    <h2>Lotto Max 深度分析走勢圖 (自動更新)</h2>
+    <div id="table-container">正在加載數據...</div>
 </div>
 
 <script>
 Papa.parse("data.csv", {
     download: true,
     header: true,
+    skipEmptyLines: true,
     complete: function(results) {
         let data = results.data;
+        if (data.length === 0) {
+            document.getElementById('table-container').innerText = "未搵到數據，請確保 data.csv 已更新。";
+            return;
+        }
+
         let html = '<table><thead><tr>';
-        html += '<th>日期</th><th>號碼 (n1-n7)</th><th>單雙</th><th>連續</th><th>上期重複</th><th>Zone</th>';
+        html += '<th>開彩日期</th><th>開彩號碼 (7 Balls)</th><th>單雙</th><th>連續</th><th>重複上期</th><th>Zone</th>';
         html += '</tr></thead><tbody>';
 
         data.forEach(row => {
-            if(!row['Draw Date']) return;
-            
-            // 號碼球視覺化
-            let balls = '';
-            ['n1','n2','n3','n4','n5','n6','n7'].forEach(k => {
-                balls += `<span class="num-ball">${row[k]}</span>`;
+            // 1. 自動搵出 7 個號碼 (唔理佢叫 n1 定 Number 1)
+            let nums = [];
+            Object.keys(row).forEach(key => {
+                let val = parseInt(row[key]);
+                if (val >= 1 && val <= 50 && key.toLowerCase().includes('n') || key.toLowerCase().includes('ball') || key.toLowerCase().includes('number')) {
+                    if (nums.length < 7) nums.push(val);
+                }
             });
+            nums.sort((a,b) => a-b);
 
-            // 邏輯處理
-            let repeatClass = parseInt(row['repeats']) >= 2 ? 'class="repeat-high"' : '';
-            let consecClass = row['consecutive'] === 'Yes' ? 'class="consec-yes"' : '';
+            if(nums.length < 7) return; // 跳過格式不完整的行
+
+            let ballsHtml = nums.map(n => `<span class="num-ball">${n}</span>`).join('');
+            
+            // 2. 顯示 Python 計好咗嘅數據
+            let oe = row['odd_even'] || '-';
+            let consec = row['consecutive'] === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : 'No';
+            let repeats = parseInt(row['repeats']) >= 2 ? `<span class="stat-tag repeat-high">${row['repeats']} 個</span>` : (row['repeats'] || '0') + ' 個';
+            let zone = row['Zone'] || row['zone'] || '-';
+            let date = row['Draw Date'] || row['Date'] || row['date'] || 'Unknown';
 
             html += `<tr>
-                <td>${row['Draw Date']}</td>
-                <td style="text-align:left;">${balls}</td>
-                <td>${row['odd_even'] || '-'}</td>
-                <td><span ${consecClass}>${row['consecutive'] || '-'}</span></td>
-                <td ${repeatClass}>${row['repeats'] || '0'}</td>
-                <td>${row['Zone'] || '-'}</td>
+                <td style="color:#666; font-weight:500;">${date}</td>
+                <td style="text-align:left;">${ballsHtml}</td>
+                <td><strong>${oe}</strong></td>
+                <td>${consec}</td>
+                <td>${repeats}</td>
+                <td><span class="stat-tag zone-label">${zone}</span></td>
             </tr>`;
         });
 

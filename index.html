@@ -30,14 +30,17 @@
 </div>
 
 <script>
-Papa.parse("data.csv", {
+// 【破冰魔法】加咗時間戳，確保每次都攞最新嘅 data.csv，唔會畀瀏覽器呃
+let csvUrl = "data.csv?t=" + new Date().getTime();
+
+Papa.parse(csvUrl, {
     download: true,
     header: true,
     skipEmptyLines: true,
     complete: function(results) {
         let data = results.data;
         if (data.length === 0 || !data[0].n1) {
-            document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據，請等待 GitHub Actions 完成更新。</p>";
+            document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據。請確定 GitHub Actions 已經成功行完，同埋 data.csv 入面有數字。</p>";
             return;
         }
 

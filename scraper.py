@@ -1,62 +1,95 @@
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
 import os
 
-def calculate_metrics(df):
-    # 1. 淨係保留有用嘅欄位，將 Excel 啲 Unnamed 垃圾吉格清走
-    cols_to_keep = ['date', 'weekday', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'bonus']
-    df = df[[c for c in cols_to_keep if c in df.columns]].copy()
+def get_web_data():
+    all_draws = []
+    current_year = datetime.now().year
     
-    # 2. 處理日期，排好先後次序 (由舊到新，方便計重複號碼)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date', ascending=True)
+    # 自動爬取過去 4 年嘅開彩數據
+    for year in range(current_year, current_year - 4, -1):
+        url = f"https://www.lottomaxnumbers.com/numbers/{year}"
+        print(f"📡 自動獲取緊 {year} 年嘅數據...")
+        
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        resp = requests.get(url, headers=headers)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        
+        # 喺網頁 HTML 入面搵開彩表格
+        for row in soup.find_all('tr'):
+            cols = row.find_all('td')
+            if len(cols) >= 2:
+                # 1. 攞日期
+                date_str = cols[0].get_text(strip=True)
+                
+                # 2. 攞號碼波波
+                balls = []
+                for element in cols[1].find_all(['li', 'div', 'span']):
+                    txt = element.get_text(strip=True)
+                    if txt.isdigit():
+                        balls.append(int(txt))
+                
+                # 3. 確保抽齊 7 個號碼
+                if len(balls) >= 7:
+                    nums = sorted(balls[:7])
+                    all_draws.append({
+                        'date': date_str,
+                        'n1': nums[0], 'n2': nums[1], 'n3': nums[2],
+                        'n4': nums[3], 'n5': nums[4], 'n6': nums[5], 'n7': nums[6]
+                    })
+                    
+    return pd.DataFrame(all_draws)
+
+def calculate_metrics(df):
+    # 排好日期，由舊到新
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df = df.dropna(subset=['date']).drop_duplicates(subset=['date']).sort_values('date', ascending=True)
     
     prev_numbers = set()
+    results = []
     
-    # 3. 逐行計數
-    def process_row(row):
-        nonlocal prev_numbers
-        # 攞 n1 到 n7 嘅號碼
+    for _, row in df.iterrows():
         nums = [int(row[f'n{i}']) for i in range(1, 8)]
-        nums.sort()
         
-        # 單雙
-        odds = len([n for n in nums if n % 2 != 0])
-        odd_even = f"{odds}O{7-odds}E"
+        # 統計 1: 單雙
+        odds = sum(1 for n in nums if n % 2 != 0)
+        row['odd_even'] = f"{odds}O{7-odds}E"
         
-        # 連續
+        # 統計 2: 連續
         has_consec = "No"
         for i in range(len(nums)-1):
             if nums[i+1] - nums[i] == 1:
                 has_consec = "Yes"
                 break
-                
-        # 上期重複
-        repeats = len(set(nums).intersection(prev_numbers)) if prev_numbers else 0
-        prev_numbers = set(nums)
+        row['consecutive'] = has_consec
         
-        # 分區
-        zone = f"Z{(nums[0]-1)//7 + 1}"
+        # 統計 3: 上期重複
+        curr_set = set(nums)
+        row['repeats'] = len(curr_set.intersection(prev_numbers)) if prev_numbers else 0
+        prev_numbers = curr_set
         
-        return pd.Series([odd_even, has_consec, repeats, zone])
+        # 統計 4: 分區 Zone
+        row['zone'] = f"Z{(nums[0]-1)//7 + 1}"
         
-    # 將計好嘅 4 個結果寫入表度
-    df[['odd_even', 'consecutive', 'repeats', 'zone']] = df.apply(process_row, axis=1)
-    
-    # 4. 排返由新到舊 (最新一期擺最頂)
-    df = df.sort_values('date', ascending=False)
-    # 將日期變返靚靚格式 (例如 2024-03-20)
-    df['date'] = df['date'].dt.strftime('%Y-%m-%d')
-    
-    return df
+        results.append(row)
+        
+    # 最後排返由新到舊
+    final_df = pd.DataFrame(results).sort_values('date', ascending=False)
+    final_df['date'] = final_df['date'].dt.strftime('%Y-%m-%d')
+    return final_df
 
 def main():
-    if os.path.exists('data.csv'):
-        df = pd.read_csv('data.csv')
-        updated_df = calculate_metrics(df)
-        updated_df.to_csv('data.csv', index=False)
-        print("✅ 成功！已經為你份專屬 CSV 完成所有統計計算。")
+    print("🚀 啟動全自動網頁爬蟲...")
+    df = get_web_data()
+    
+    if len(df) > 0:
+        final_df = calculate_metrics(df)
+        final_df.to_csv('data.csv', index=False)
+        print(f"✅ 大功告成！成功上網獲取並分析咗 {len(final_df)} 期 Lotto Max 數據！")
     else:
-        print("❌ 搵唔到 data.csv")
+        print("❌ 錯誤：爬唔到任何數據。")
 
 if __name__ == "__main__":
     main()

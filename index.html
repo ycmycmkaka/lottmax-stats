@@ -2,59 +2,77 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>Lotto Max 深度走勢分析表 📈</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lotto Max 全自動走勢分析 📈</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #007aff; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { background: #007aff; color: white; padding: 12px; font-size: 14px; position: sticky; top:0; }
-        td { border-bottom: 1px solid #eee; padding: 12px; text-align: center; font-size: 13px; }
-        .num-ball { display: inline-block; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: #eee; margin: 2px; font-weight: bold; border: 1px solid #ccc; }
-        .tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #007aff; margin-bottom: 25px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #007aff; color: white; padding: 14px 10px; position: sticky; top: 0; z-index: 10; }
+        td { border-bottom: 1px solid #eee; padding: 14px 10px; text-align: center; }
+        tr:hover { background-color: #f8fbff; }
+        .num-ball { display: inline-block; width: 30px; height: 30px; line-height: 30px; border-radius: 50%; background: linear-gradient(135deg, #ffffff 0%, #e9ecef 100%); margin: 2px; font-weight: bold; border: 1px solid #ccc; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
+        .stat-tag { padding: 5px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .consec-yes { background: #e6f4ea; color: #1e8e3e; }
         .repeat-high { background: #fce8e6; color: #d93025; }
-        .zone-label { background: #e8f0fe; color: #1967d2; }
+        .zone-label { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; }
+        .update-time { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
+
 <div class="container">
-    <h2>Lotto Max 深度走勢分析表</h2>
-    <div id="table-container">數據讀取中...</div>
+    <h2>Lotto Max 深度走勢分析表 (全自動更新)</h2>
+    <div class="update-time">📊 數據已經由 AI 機械人自動抓取並運算</div>
+    <div id="table-container">正在加載最新數據...</div>
 </div>
+
 <script>
 Papa.parse("data.csv", {
     download: true,
     header: true,
+    skipEmptyLines: true,
     complete: function(results) {
-        let html = '<table><thead><tr><th>日期</th><th>號碼</th><th>單雙</th><th>連續</th><th>重複</th><th>Zone</th></tr></thead><tbody>';
-        
-        results.data.forEach(row => {
-            // 統一將 Key 變做細寫方便配對
-            let lowerRow = {};
-            Object.keys(row).forEach(k => lowerRow[k.toLowerCase().trim()] = row[k]);
+        let data = results.data;
+        if (data.length === 0 || !data[0].n1) {
+            document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據，請等待 GitHub Actions 完成更新。</p>";
+            return;
+        }
 
-            // 搵號碼
-            let nums = [];
-            Object.keys(lowerRow).forEach(k => {
-                if((k.startsWith('n') || k.includes('ball')) && !isNaN(parseInt(lowerRow[k]))) {
-                    if(nums.length < 7) nums.push(parseInt(lowerRow[k]));
-                }
-            });
-            nums.sort((a,b) => a-b);
-            if(nums.length < 7) return;
+        let html = '<table><thead><tr>';
+        html += '<th>開彩日期</th><th>開彩號碼 (7 Balls)</th><th>單雙</th><th>連續號碼</th><th>上期重複</th><th>Zone分區</th>';
+        html += '</tr></thead><tbody>';
 
-            let balls = nums.map(n => `<span class="num-ball">${n}</span>`).join('');
-            let oe = lowerRow['odd_even'] || '-';
-            let consec = lowerRow['consecutive'] === 'Yes' ? '<span class="tag consec-yes">Yes</span>' : 'No';
-            let repeats = parseInt(lowerRow['repeats']) >= 2 ? `<span class="tag repeat-high">${lowerRow['repeats']}個</span>` : (lowerRow['repeats'] || '0') + '個';
-            let zone = lowerRow['zone'] || '-';
-            let date = lowerRow['draw date'] || lowerRow['date'] || '-';
+        data.forEach(row => {
+            if(!row.n1) return; // 安全檢查
+            
+            // 畫波波
+            let ballsHtml = '';
+            for(let i=1; i<=7; i++) {
+                ballsHtml += `<span class="num-ball">${row['n'+i]}</span>`;
+            }
+            
+            // 讀取爬蟲計好嘅數據
+            let date = row['date'] || '-';
+            let oe = row['odd_even'] || '-';
+            let consec = row['consecutive'] === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : 'No';
+            let repeats = parseInt(row['repeats']) >= 2 ? `<span class="stat-tag repeat-high">${row['repeats']} 個</span>` : (row['repeats'] || '0') + ' 個';
+            let zone = row['zone'] || '-';
 
-            html += `<tr><td>${date}</td><td style="text-align:left;">${balls}</td><td><strong>${oe}</strong></td><td>${consec}</td><td>${repeats}</td><td><span class="tag zone-label">${zone}</span></td></tr>`;
+            html += `<tr>
+                <td style="color:#555; font-weight:500;">${date}</td>
+                <td style="text-align:left;">${ballsHtml}</td>
+                <td><strong>${oe}</strong></td>
+                <td>${consec}</td>
+                <td>${repeats}</td>
+                <td><span class="stat-tag zone-label">${zone}</span></td>
+            </tr>`;
         });
-        document.getElementById('table-container').innerHTML = html + '</tbody></table>';
+
+        html += '</tbody></table>';
+        document.getElementById('table-container').innerHTML = html;
     }
 });
 </script>

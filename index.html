@@ -11,25 +11,27 @@
         h2 { text-align: center; color: #007aff; margin-bottom: 10px; font-size: 20px; }
         .update-time { text-align: center; color: #666; font-size: 12px; margin-bottom: 15px; }
         
-        /* 📱 神仙屬性：令個表格喺手機可以左右滑動，唔會被夾硬壓扁 */
         .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
         
-        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 750px; /* 確保表格有足夠闊度呼吸 */ }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 750px; }
         th { background: #007aff; color: white; padding: 12px 8px; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
         td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: center; vertical-align: middle; }
         tr:hover { background-color: #f8fbff; }
         
-        /* 波波專用設定 */
-        .balls-container { white-space: nowrap; } /* 鎖死 7 個波一定要喺同一行 */
+        .balls-container { white-space: nowrap; }
         .num-ball { display: inline-block; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: linear-gradient(135deg, #ffffff 0%, #e9ecef 100%); margin: 0 2px; font-weight: bold; font-size: 13px; border: 1px solid #ccc; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
         
-        /* 標籤設定 */
         .stat-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; white-space: nowrap; }
-        .consec-yes { background: #e6f4ea; color: #1e8e3e; }
-        .repeat-high { background: #fce8e6; color: #d93025; }
+        
+        /* 🎨 新增/修改嘅顏色設定 */
+        .consec-yes { background: #e6f4ea; color: #1e8e3e; } /* 綠色 Yes */
+        .consec-no { background: #fce8e6; color: #d93025; }  /* 紅色 No */
+        
+        .repeat-high { background: #fce8e6; color: #d93025; } /* 紅色 (2個或以上) */
+        .repeat-low { background: #e6f4ea; color: #1e8e3e; }  /* 綠色 (1個) */
+        
         .zone-label { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; display: inline-block; }
 
-        /* 📱 針對手機螢幕嘅特別微調 */
         @media (max-width: 600px) {
             body { padding: 5px; }
             .container { padding: 10px; }
@@ -47,7 +49,6 @@
 </div>
 
 <script>
-// 破冰魔法：防止手機 Safari 記住舊網頁
 let csvUrl = "data.csv?t=" + new Date().getTime();
 
 Papa.parse(csvUrl, {
@@ -68,7 +69,6 @@ Papa.parse(csvUrl, {
         data.forEach(row => {
             if(!row.n1) return;
             
-            // 用 div 包住啲波波，等佢哋唔會散開
             let ballsHtml = '<div class="balls-container">';
             for(let i=1; i<=7; i++) {
                 ballsHtml += `<span class="num-ball">${row['n'+i]}</span>`;
@@ -77,8 +77,23 @@ Papa.parse(csvUrl, {
             
             let date = row['date'] || '-';
             let oe = row['odd_even'] || '-';
-            let consec = row['consecutive'] === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : 'No';
-            let repeats = parseInt(row['repeats']) >= 2 ? `<span class="stat-tag repeat-high">${row['repeats']} 個</span>` : (row['repeats'] || '0') + ' 個';
+            
+            // 🎨 連續號碼：Yes 綠色，No 紅色
+            let consec = row['consecutive'] === 'Yes' ? 
+                '<span class="stat-tag consec-yes">Yes</span>' : 
+                '<span class="stat-tag consec-no">No</span>';
+            
+            // 🎨 上期重複：2個或以上紅色，1個綠色，0個冇色
+            let repeatCount = parseInt(row['repeats']) || 0;
+            let repeatsHtml = '';
+            if (repeatCount >= 2) {
+                repeatsHtml = `<span class="stat-tag repeat-high">${repeatCount} 個</span>`;
+            } else if (repeatCount === 1) {
+                repeatsHtml = `<span class="stat-tag repeat-low">1 個</span>`;
+            } else {
+                repeatsHtml = '0 個';
+            }
+            
             let zone = row['zone'] || '-';
 
             html += `<tr>
@@ -86,7 +101,7 @@ Papa.parse(csvUrl, {
                 <td style="text-align:center;">${ballsHtml}</td>
                 <td style="white-space:nowrap;"><strong>${oe}</strong></td>
                 <td>${consec}</td>
-                <td style="white-space:nowrap;">${repeats}</td>
+                <td style="white-space:nowrap;">${repeatsHtml}</td>
                 <td style="white-space:nowrap;"><span class="stat-tag zone-label">${zone}</span></td>
             </tr>`;
         });

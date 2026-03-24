@@ -2,109 +2,64 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lotto Max 數據分析儀表板 📊</title>
+    <title>Lotto Max 深度分析表 📈</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        h1 { text-align: center; color: #007aff; }
-        .stat-card { background: #fff; border: 1px solid #eee; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
-        .number-tag { display: inline-block; background: #007aff; color: white; padding: 5px 12px; border-radius: 20px; margin: 4px; font-weight: bold; }
-        #error-msg { color: red; text-align: center; font-weight: bold; display: none; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th { background: #007aff; color: white; position: sticky; top: 0; padding: 12px; }
+        td { border: 1px solid #eee; padding: 10px; text-align: center; }
+        tr:nth-child(even) { background: #fafafa; }
+        .num-ball { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: #eee; margin: 2px; font-weight: bold; }
+        .repeat-high { color: red; font-weight: bold; } /* 重複多過2個變紅 */
+        .consec-yes { background: #fff3cd; color: #856404; padding: 2px 5px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Lotto Max 歷史數據統計</h1>
-    <div id="loading">📊 正在讀取 data.csv...</div>
-    <div id="error-msg">❌ 讀取失敗：搵唔到 data.csv 或者格式唔啱。</div>
-    
-    <div id="dashboard" style="display: none;">
-        <div class="stat-card">
-            <h3>🔥 最旺號碼 (出現次數最多)</h3>
-            <div id="hot-numbers"></div>
-        </div>
-        
-        <div class="stat-card">
-            <h3>⚖️ 整體單雙分佈</h3>
-            <div id="even-odd-text" style="font-size: 1.2em; font-weight: bold;"></div>
-        </div>
-
-        <div id="debug-info" style="font-size: 0.8em; color: #999; margin-top: 20px;"></div>
-    </div>
+    <h2>Lotto Max 走勢分析儀表板</h2>
+    <div id="table-container">讀取數據中...</div>
 </div>
 
 <script>
-// 讀取 CSV
 Papa.parse("data.csv", {
     download: true,
     header: true,
-    skipEmptyLines: true,
     complete: function(results) {
-        if (results.data.length === 0) {
-            showError("CSV 入面無數據呀！");
-            return;
-        }
-        processData(results.data);
-    },
-    error: function(err) {
-        showError("搵唔到 data.csv，請檢查檔案名係咪正確。");
+        let data = results.data;
+        let html = '<table><thead><tr>';
+        html += '<th>日期</th><th>號碼 (n1-n7)</th><th>單雙</th><th>連續</th><th>上期重複</th><th>Zone</th>';
+        html += '</tr></thead><tbody>';
+
+        data.forEach(row => {
+            if(!row['Draw Date']) return;
+            
+            // 號碼球視覺化
+            let balls = '';
+            ['n1','n2','n3','n4','n5','n6','n7'].forEach(k => {
+                balls += `<span class="num-ball">${row[k]}</span>`;
+            });
+
+            // 邏輯處理
+            let repeatClass = parseInt(row['repeats']) >= 2 ? 'class="repeat-high"' : '';
+            let consecClass = row['consecutive'] === 'Yes' ? 'class="consec-yes"' : '';
+
+            html += `<tr>
+                <td>${row['Draw Date']}</td>
+                <td style="text-align:left;">${balls}</td>
+                <td>${row['odd_even'] || '-'}</td>
+                <td><span ${consecClass}>${row['consecutive'] || '-'}</span></td>
+                <td ${repeatClass}>${row['repeats'] || '0'}</td>
+                <td>${row['Zone'] || '-'}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('table-container').innerHTML = html;
     }
 });
-
-function showError(msg) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error-msg').style.display = 'block';
-    document.getElementById('error-msg').innerText = msg;
-}
-
-function processData(data) {
-    let numFreq = {};
-    let odds = 0, evens = 0;
-    let rowCount = 0;
-
-    data.forEach(row => {
-        // 智能掃描：只要個 Value 係 1-50 嘅數字就攞出嚟
-        Object.values(row).forEach(val => {
-            let n = parseInt(val);
-            if (!isNaN(n) && n >= 1 && n <= 50) {
-                numFreq[n] = (numFreq[n] || 0) + 1;
-                if (n % 2 === 0) evens++; else odds++;
-            }
-        });
-        rowCount++;
-    });
-
-    if (Object.keys(numFreq).length === 0) {
-        showError("讀到檔案，但搵唔到任何 1-50 嘅號碼。請檢查 CSV 格式。");
-        return;
-    }
-
-    display(numFreq, odds, evens, rowCount);
-}
-
-function display(numFreq, odds, evens, rowCount) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-
-    // 1. 顯示最旺號碼
-    const sorted = Object.entries(numFreq).sort((a, b) => b[1] - a[1]).slice(0, 15);
-    const hotDiv = document.getElementById('hot-numbers');
-    sorted.forEach(([num, count]) => {
-        hotDiv.innerHTML += `<span class="number-tag">${num} <small>(${count}次)</small></span>`;
-    });
-
-    // 2. 單雙
-    const total = odds + evens;
-    document.getElementById('even-odd-text').innerHTML = `
-        單數: ${((odds/total)*100).toFixed(1)}% | 
-        雙數: ${((evens/total)*100).toFixed(1)}%
-    `;
-
-    document.getElementById('debug-info').innerText = `成功分析咗 ${rowCount} 期數據。`;
-}
 </script>
 </body>
 </html>

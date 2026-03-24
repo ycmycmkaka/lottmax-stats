@@ -2,7 +2,6 @@ name: Lotto Max Auto Scraper
 
 on:
   schedule:
-    # 逢星期三同六自動上網抓取最新開彩
     - cron: '0 8 * * 3,6'
   workflow_dispatch:
 

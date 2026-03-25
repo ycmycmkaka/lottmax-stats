@@ -84,12 +84,11 @@ def calculate_metrics(df):
         odds = sum(1 for n in nums if n % 2 != 0)
         row['odd_even'] = f"{odds}單 {7-odds}雙"
         
-        has_consec = "No"
+consec_count = 0
         for i in range(len(nums)-1):
             if nums[i+1] - nums[i] == 1:
-                has_consec = "Yes"
-                break
-        row['consecutive'] = has_consec
+                consec_count += 1
+        row['consecutive'] = f"{consec_count} 個連續"
         
         curr_set = set(nums)
         row['repeats'] = len(curr_set.intersection(prev_numbers)) if prev_numbers else 0

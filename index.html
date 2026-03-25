@@ -38,10 +38,10 @@
         .repeat-low { background: #e6f4ea; color: #1e8e3e; }  
         .zone-label { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; display: inline-block; }
         
-        /* 🌟 獎金專屬標籤設計 */
+        /* 🌟 獎金專屬標籤設計 (顏色已反轉！) */
         .prize-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block; background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .prize-reset { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; } /* $10M 洗牌綠色 */
-        .prize-max { background: #fce8e6; color: #d93025; border: 1px solid #f5c6cb; } /* $50M 以上金多寶紅色 */
+        .prize-reset { background: #fce8e6; color: #d93025; border: 1px solid #f5c6cb; } /* $10M 洗牌變紅色 (Stop) */
+        .prize-max { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; } /* $50M 以上金多寶變綠色 (Go) */
 
         @media (max-width: 600px) {
             body { padding: 5px; }
@@ -138,7 +138,6 @@ Papa.parse(csvUrl, {
         dashHtml += `</div>`;
         document.getElementById('dashboard-container').innerHTML = dashHtml;
 
-        // 🌟 表格標題加入「獎金 (Jackpot)」
         let html = '<table><thead><tr>';
         html += '<th>開彩日期</th><th>開彩號碼 (7 Balls)</th><th>獎金 (Jackpot)</th><th>單雙</th><th>連續</th><th>上期重複</th><th>Zone分區</th>';
         html += '</tr></thead><tbody>';
@@ -157,7 +156,7 @@ Papa.parse(csvUrl, {
             let repeatsHtml = repeatCount >= 2 ? `<span class="stat-tag repeat-high">${repeatCount} 個</span>` : (repeatCount === 1 ? `<span class="stat-tag repeat-low">1 個</span>` : '0 個');
             let zone = row['zone'] || '-';
             
-            // 🌟 獎金智能變色邏輯
+            // 🌟 獎金智能變色邏輯 (無改，因為顏色定義喺上面 CSS 改咗)
             let prize = row['prize'] || '-';
             let prizeClass = 'prize-tag';
             if (prize === '$10M') {

@@ -38,10 +38,9 @@
         .repeat-low { background: #e6f4ea; color: #1e8e3e; }  
         .zone-label { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; display: inline-block; }
         
-        /* 🌟 獎金專屬標籤設計 (顏色已反轉！) */
         .prize-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block; background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .prize-reset { background: #fce8e6; color: #d93025; border: 1px solid #f5c6cb; } /* $10M 洗牌變紅色 (Stop) */
-        .prize-max { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; } /* $50M 以上金多寶變綠色 (Go) */
+        .prize-reset { background: #fce8e6; color: #d93025; border: 1px solid #f5c6cb; } 
+        .prize-max { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; } 
 
         @media (max-width: 600px) {
             body { padding: 5px; }
@@ -69,99 +68,134 @@ Papa.parse(csvUrl, {
     header: true,
     skipEmptyLines: true,
     complete: function(results) {
-        let data = results.data;
-        if (data.length === 0 || !data[0].n1) {
-            document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據，請稍後再試。</p>";
-            return;
-        }
-
-        let totalDraws = 0;
-        let stats = {
-            oe: {}, 
-            // 🌟 將連續統計變成空嘅 Object，等佢自動裝入 0個、1個、2個
-            consec: {},
-            repeats: { '0個': 0, '1個': 0, '2個': 0, '3個或以上': 0 }, 
-            zones: {}
-        };
-
-        data.forEach(row => {
-            if(!row.n1) return;
-            totalDraws++;
-
-            let oe = row['odd_even'];
-            if(oe) stats.oe[oe] = (stats.oe[oe] || 0) + 1;
-
-            // 🌟 智能讀取精準嘅連續數量
-            let consecVal = row['consecutive'] || '0 個連續';
-            stats.consec[consecVal] = (stats.consec[consecVal] || 0) + 1;
-
-            let rCount = parseInt(row['repeats']) || 0;
-            if(rCount === 0) stats.repeats['0個']++;
-            else if(rCount === 1) stats.repeats['1個']++;
-            else if(rCount === 2) stats.repeats['2個']++;
-            else stats.repeats['3個或以上']++;
-
-            let zoneStr = row['zone'];
-            if(zoneStr) {
-                let match = zoneStr.match(/^(\d)/);
-                if(match) {
-                    let zName = match[1] + '個區';
-                    stats.zones[zName] = (stats.zones[zName] || 0) + 1;
-                }
+        // 🌟 防彈盾牌：用 Try...Catch 包住，有事即刻報警
+        try {
+            let data = results.data;
+            if (data.length === 0 || !data[0].n1) {
+                document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據，請稍後再試。</p>";
+                return;
             }
-        });
 
-        function renderStatCard(title, statObj, cardType) {
-            // 🌟 除了 Odd/Even 之外，其他按次數排
-            let sortedArr = Object.entries(statObj).sort((a, b) => b[1] - a[1]);
-            
-            let html = `<div class="stat-card"><h3>${title}</h3>`;
-            sortedArr.forEach(item => {
-                let label = item[0]; let count = item[1];
-                let pct = totalDraws > 0 ? Math.round((count / totalDraws) * 100) : 0;
-                
-                let color = "#007aff"; 
-                // 🌟 智能顏色：如果是連續統計，0個紅色，其餘綠色
-                if (cardType === 'consec') {
-                    if (label !== '0 個連續') color = "#1e8e3e"; // 有連續就綠色
-                    else color = "#d93025"; // 0個就紅色
+            let totalDraws = 0;
+            let stats = {
+                oe: {}, consec: {}, repeats: { '0個': 0, '1個': 0, '2個': 0, '3個或以上': 0 }, zones: {}
+            };
+
+            data.forEach(row => {
+                if(!row.n1) return;
+                totalDraws++;
+
+                let oe = row['odd_even'];
+                if(oe) stats.oe[oe] = (stats.oe[oe] || 0) + 1;
+
+                let consecVal = row['consecutive'] || '0 個連續';
+                stats.consec[consecVal] = (stats.consec[consecVal] || 0) + 1;
+
+                let rCount = parseInt(row['repeats']) || 0;
+                if(rCount === 0) stats.repeats['0個']++;
+                else if(rCount === 1) stats.repeats['1個']++;
+                else if(rCount === 2) stats.repeats['2個']++;
+                else stats.repeats['3個或以上']++;
+
+                let zoneStr = row['zone'];
+                if(zoneStr) {
+                    let match = zoneStr.match(/^(\d)/);
+                    if(match) {
+                        let zName = match[1] + '個區';
+                        stats.zones[zName] = (stats.zones[zName] || 0) + 1;
+                    }
+                }
+            });
+
+            // 🌟 核心修復：取締唔兼容嘅寫法，直接傳入 limit 參數
+            function renderStatCard(title, statObj, cardType, limit=null) {
+                let sortedArr = Object.entries(statObj).sort((a, b) => b[1] - a[1]);
+                if (limit !== null) {
+                    sortedArr = sortedArr.slice(0, limit);
                 }
                 
-                html += `
-                <div class="bar-row">
-                    <div class="bar-label">${label}</div>
-                    <div class="bar-track"><div class="bar-fill" style="width: ${pct}%; background: ${color};"></div></div>
-                    <div class="bar-pct">${pct}%</div>
-                </div>`;
+                let html = `<div class="stat-card"><h3>${title}</h3>`;
+                sortedArr.forEach(item => {
+                    let label = item[0]; let count = item[1];
+                    let pct = totalDraws > 0 ? Math.round((count / totalDraws) * 100) : 0;
+                    
+                    let color = "#007aff"; 
+                    if (cardType === 'consec') {
+                        if (label !== '0 個連續') color = "#1e8e3e"; 
+                        else color = "#d93025"; 
+                    }
+                    
+                    html += `
+                    <div class="bar-row">
+                        <div class="bar-label">${label}</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: ${pct}%; background: ${color};"></div></div>
+                        <div class="bar-pct">${pct}%</div>
+                    </div>`;
+                });
+                html += `</div>`;
+                return html;
+            }
+
+            let dashHtml = `<div class="total-draws">總共分析了 ${totalDraws} 期歷史數據</div><div class="dashboard">`;
+            dashHtml += renderStatCard('單雙分佈 (Top 4)', stats.oe, 'oe', 4);
+            dashHtml += renderStatCard('連續號碼數量', stats.consec, 'consec');
+            dashHtml += renderStatCard('上期重複', stats.repeats, 'repeats');
+            dashHtml += renderStatCard('涵蓋分區', stats.zones, 'zones');
+            dashHtml += `</div>`;
+            document.getElementById('dashboard-container').innerHTML = dashHtml;
+
+            let html = '<table><thead><tr>';
+            html += '<th>開彩日期</th><th>開彩號碼 (7 Balls)</th><th>獎金 (Jackpot)</th><th>單雙</th><th>連續號碼</th><th>上期重複</th><th>Zone分區</th>';
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                if(!row.n1) return;
+                
+                let ballsHtml = '<div class="balls-container">';
+                for(let i=1; i<=7; i++) { ballsHtml += `<span class="num-ball">${row['n'+i]}</span>`; }
+                ballsHtml += '</div>';
+                
+                let date = row['date'] || '-';
+                let oe = row['odd_even'] || '-';
+                
+                let consecVal = row['consecutive'] || '0 個連續';
+                let consecHtml = consecVal !== '0 個連續' ? 
+                    `<span class="stat-tag consec-yes">${consecVal}</span>` : 
+                    `<span class="stat-tag consec-no">${consecVal}</span>`;
+                
+                let repeatCount = parseInt(row['repeats']) || 0;
+                let repeatsHtml = repeatCount >= 2 ? `<span class="stat-tag repeat-high">${repeatCount} 個</span>` : (repeatCount === 1 ? `<span class="stat-tag repeat-low">1 個</span>` : '0 個');
+                let zone = row['zone'] || '-';
+                
+                let prize = row['prize'] || '-';
+                let prizeClass = 'prize-tag';
+                if (prize === '$10M') {
+                    prizeClass += ' prize-reset';
+                } else if (prize && prize !== '-' && parseInt(prize.replace(/\$|M/g, '')) >= 50) {
+                    prizeClass += ' prize-max';
+                }
+                let prizeHtml = `<span class="${prizeClass}">${prize}</span>`;
+
+                html += `<tr>
+                    <td style="color:#555; font-weight:500; white-space:nowrap;">${date}</td>
+                    <td style="text-align:center;">${ballsHtml}</td>
+                    <td style="white-space:nowrap;">${prizeHtml}</td>
+                    <td style="white-space:nowrap;"><strong>${oe}</strong></td>
+                    <td style="white-space:nowrap;">${consecHtml}</td>
+                    <td style="white-space:nowrap;">${repeatsHtml}</td>
+                    <td style="white-space:nowrap;"><span class="stat-tag zone-label">${zone}</span></td>
+                </tr>`;
             });
-            html += `</div>`;
-            return html;
+
+            html += '</tbody></table>';
+            document.getElementById('table-container').innerHTML = html;
+            
+        } catch (error) {
+            // 🚨 錯誤偵測器：有事就直接彈出紅字，等我哋知邊度有問題！
+            document.getElementById('table-container').innerHTML = `<p style="color:red; text-align:center; padding:20px; background:#fff; border: 1px solid red;"><b>網頁發生錯誤：</b><br>${error.message}</p>`;
         }
-
-        let dashHtml = `<div class="total-draws">總共分析了 ${totalDraws} 期歷史數據</div><div class="dashboard">`;
-        dashHtml += renderStatCard('單雙分佈 (Top 4)', Object.fromEntries(Object.entries(stats.oe).sort((a,b)=>b[1]-a[1]).slice(0,4)));
-        // 🌟 升級版連續統計 Card
-        dashHtml += renderStatCard('連續號碼數量', stats.consec, 'consec');
-        dashHtml += renderStatCard('上期重複', stats.repeats);
-        dashHtml += renderStatCard('涵蓋分區', stats.zones);
-        dashHtml += `</div>`;
-        document.getElementById('dashboard-container').innerHTML = dashHtml;
-
-        let html = '<table><thead><tr>';
-        html += '<th>開彩日期</th><th>開彩號碼 (7 Balls)</th><th>獎金 (Jackpot)</th><th>單雙</th><th>連續號碼</th><th>上期重複</th><th>Zone分區</th>';
-        html += '</tr></thead><tbody>';
-
-        data.forEach(row => {
-            if(!row.n1) return;
-            
-            let ballsHtml = '<div class="balls-container">';
-            for(let i=1; i<=7; i++) { ballsHtml += `<span class="num-ball">${row['n'+i]}</span>`; }
-            ballsHtml += '</div>';
-            
-            let date = row['date'] || '-';
-            let oe = row['odd_even'] || '-';
-            
-            // 🌟 升級版表格顯示
-            let consecVal = row['consecutive'] || '0 個連續';
-            let consecHtml = consecVal !== '0 個連續' ? 
-                `<span class="stat-tag consec-yes">${consecVal}</span>` :
+    }
+});
+</script>
+</body>
+</html>

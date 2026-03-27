@@ -11,14 +11,19 @@ def scrape_url(url, all_draws):
         resp = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(resp.text, 'html.parser')
         
-        # 搵網頁入面所有嘅表格行
         for row in soup.find_all('tr'):
             cols = row.find_all('td')
             if len(cols) >= 3:
-                # 🌟 清洗日期：移除 Latest, 星號，同埋多餘嘅空白
                 raw_date = cols[0].get_text(" ", strip=True)
-                clean_date = re.sub(r'(?i)latest|\*', '', raw_date).strip()
                 
+                # 🌟 偵探級除錯：精準抽出「月份 日期, 年份」，無視 "with MAXMILLIONS" 等多餘字眼
+                date_match = re.search(r'([A-Za-z]+\s+\d{1,2},\s+\d{4})', raw_date)
+                if date_match:
+                    clean_date = date_match.group(1)
+                else:
+                    # 後備方案
+                    clean_date = re.sub(r'(?i)latest|\*|with maxmillions', '', raw_date).strip()
+                    
                 balls = []
                 for element in cols[1].find_all(['li', 'div', 'span']):
                     txt = element.get_text(strip=True)
@@ -44,7 +49,6 @@ def scrape_url(url, all_draws):
                     if num_match:
                          prize_formatted = f"${num_match.group(1)}M"
                 
-                # Lotto Max 有 7 個主波 + 1 個 Bonus (總共 8 個)，我哋攞頭 7 個主波
                 if len(balls) >= 7:
                     nums = sorted(balls[:7])
                     all_draws.append({
@@ -58,8 +62,6 @@ def scrape_url(url, all_draws):
 
 def get_web_data():
     all_draws = []
-    
-    # 🌟 絕對服從：硬性規定去呢 6 個網址刮料，保證齊全！
     urls = [
         "https://www.lottomaxnumbers.com/past-numbers",
         "https://www.lottomaxnumbers.com/numbers/2026",
@@ -68,29 +70,19 @@ def get_web_data():
         "https://www.lottomaxnumbers.com/numbers/2023",
         "https://www.lottomaxnumbers.com/numbers/2022"
     ]
-    
     for url in urls:
         scrape_url(url, all_draws)
-        
     return pd.DataFrame(all_draws)
 
 def calculate_metrics(df):
-    # 轉換日期，確保所有奇怪格式都變做統一嘅日期物件
     df['date_obj'] = pd.to_datetime(df['date'], errors='coerce')
-    
-    # 移除認唔到日期嘅垃圾數據
     df = df.dropna(subset=['date_obj'])
-    
-    # 排序，由舊至新
     df = df.sort_values('date_obj', ascending=True)
-    
-    # 🌟 終極防重覆：用日期物件做基準剷走 Duplicate，絕不手軟
     df = df.drop_duplicates(subset=['date_obj'], keep='first')
     
     prev_numbers = set()
     results = []
     
-    # 使用 to_dict() 防止 Pandas 設定錯誤
     for _, row in df.iterrows():
         row_dict = row.to_dict()
         nums = [int(row_dict[f'n{i}']) for i in range(1, 8)]
@@ -115,15 +107,13 @@ def calculate_metrics(df):
         results.append(row_dict)
         
     final_df = pd.DataFrame(results).sort_values('date_obj', ascending=False)
-    
-    # 統一將輸出日期格式化為 YYYY-MM-DD，乾淨企理
     final_df['date'] = final_df['date_obj'].dt.strftime('%Y-%m-%d')
     
     cols_to_keep = ['date', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'prize', 'odd_even', 'consecutive', 'repeats', 'zone']
     return final_df[cols_to_keep]
 
 def main():
-    print("🚀 啟動 Lotto Max 全自動網頁爬蟲 (防漏防重複版)...")
+    print("🚀 啟動 Lotto Max 全自動網頁爬蟲 (金多寶防漏版)...")
     df = get_web_data()
     
     if len(df) > 0:
